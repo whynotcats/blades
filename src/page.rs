@@ -13,6 +13,8 @@ use crate::taxonomies::{Classification, Taxonomies};
 use crate::types::{Ancestors, Any, DateTime, HashMap};
 
 use beef::lean::Cow;
+use comrak::plugins::syntect::SyntectAdapter;
+use comrak::{markdown_to_html_with_plugins, ComrakOptions, ComrakPlugins};
 use ramhorns::{
     encoding::Encoder, traits::ContentSequence, Content, Error, Ramhorns, Section, Template,
 };
@@ -704,10 +706,24 @@ impl<'p, 'r> PageList<'p, 'r> {
 
 #[inline]
 fn render_content<E: Encoder>(source: &str, encoder: &mut E) -> Result<(), E::Error> {
-    let parser = pulldown_cmark::Parser::new_ext(source, pulldown_cmark::Options::all());
-    let processed = cmark_syntax::SyntaxPreprocessor::new(parser);
-    encoder.write_html(processed)
+    let normalized_source = source.replace("\r\n", "\n");
+    let adapter = SyntectAdapter::new("base16-ocean.dark");
+    let options = ComrakOptions::default();
+    let mut plugins = ComrakPlugins::default();
+
+    plugins.render.codefence_syntax_highlighter = Some(&adapter);
+
+    let processed = markdown_to_html_with_plugins(&normalized_source, &options, &plugins);
+    encoder.write_unescaped(&processed)
 }
+
+// TODO: Add this to feature flag
+// #[inline]
+// fn render_content<E: Encoder>(source: &str, encoder: &mut E) -> Result<(), E::Error> {
+//     let parser = pulldown_cmark::Parser::new_ext(source, pulldown_cmark::Options::all());
+//     let processed = cmark_syntax::SyntaxPreprocessor::new(parser);
+//     encoder.write_html(processed)
+// }
 
 impl<'p, 'r> Content for PageList<'p, 'r> {
     #[inline]
